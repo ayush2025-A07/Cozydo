@@ -1,0 +1,456 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <title>CozyDo — Vibrant Offline To‑Do & Productivity</title>
+  <meta name="description" content="CozyDo: a cozy, colorful, offline-first to-do & productivity app (PWA)." />
+
+  <!-- App manifest will be generated at runtime so a single file can be used -->
+
+  <style>
+    :root{
+      --bg:#fff7ff;
+      --card:#ffffff;
+      --muted:#5b5b6a;
+      --accent1:#ff6b6b; /* coral */
+      --accent2:#ffb86b; /* orange */
+      --accent3:#ffd86b; /* yellow */
+      --accent4:#6bffb8; /* mint */
+      --accent5:#6bb6ff; /* sky */
+      --glass: rgba(255,255,255,0.55);
+      --radius:14px;
+      font-family: Inter, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial;
+      color: #1b1b1f;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%;margin:0;background:linear-gradient(135deg,var(--bg),#fff1f8);}
+
+    /* Layout */
+    .app{max-width:1100px;margin:18px auto;padding:18px;display:grid;grid-template-columns:1fr 360px;gap:18px}
+    .header{grid-column:1/3;display:flex;align-items:center;gap:12px}
+    .logo{display:flex;align-items:center;gap:10px}
+    .logo .mark{width:56px;height:56px;border-radius:12px;background:linear-gradient(135deg,var(--accent1),var(--accent5));display:flex;align-items:center;justify-content:center;color:white;font-weight:700;font-size:22px;box-shadow:0 8px 30px rgba(99,78,255,0.16)}
+    h1{font-size:20px;margin:0}
+    p.small{margin:0;color:var(--muted);font-size:13px}
+
+    /* Main card */
+    .card{background:var(--card);border-radius:var(--radius);padding:14px;box-shadow:0 6px 20px rgba(17,12,38,0.06)}
+    .todo-list{display:flex;flex-direction:column;gap:10px}
+
+    /* Input */
+    .new-row{display:flex;gap:8px}
+    .new-row input[type=text]{flex:1;padding:12px 14px;border-radius:10px;border:1px solid rgba(16,16,20,0.06);font-size:15px}
+    .btn{background:linear-gradient(90deg,var(--accent5),var(--accent4));border:none;padding:10px 14px;border-radius:10px;color:white;font-weight:600;cursor:pointer}
+    .btn.ghost{background:transparent;color:var(--muted);border:1px dashed rgba(0,0,0,0.06)}
+
+    /* Tasks */
+    .task{display:grid;grid-template-columns:28px 1fr auto;gap:12px;align-items:center;padding:10px;border-radius:10px}
+    .task.completed{opacity:0.6;text-decoration:line-through}
+    .task .check{width:28px;height:28px;border-radius:8px;border:1px solid rgba(16,16,20,0.06);display:flex;align-items:center;justify-content:center;cursor:pointer}
+    .task .meta{font-size:13px;color:var(--muted)}
+    .tag{padding:6px 8px;border-radius:8px;font-size:12px;background:linear-gradient(90deg,var(--accent2),var(--accent3));color:white}
+
+    /* Right column */
+    .sidebar{display:flex;flex-direction:column;gap:12px}
+    .small-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+
+    /* Calendar (simple) */
+    .calendar{display:grid;grid-template-rows:auto 1fr}
+    .month{display:flex;justify-content:space-between;align-items:center}
+    .days{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;margin-top:8px}
+    .day{padding:8px;border-radius:10px;text-align:center;font-size:13px}
+    .today{background:linear-gradient(90deg,var(--accent4),var(--accent5));color:white}
+
+    /* Notes */
+    textarea.note{width:100%;height:120px;padding:12px;border-radius:10px;border:1px solid rgba(16,16,20,0.05);resize:vertical}
+
+    /* Pomodoro */
+    .pom{display:flex;flex-direction:column;align-items:center;gap:8px;padding:12px}
+    .pom .timer{font-size:32px;font-weight:700}
+
+    /* Responsive */
+    @media(max-width:980px){.app{grid-template-columns:1fr}.header{flex-direction:column;align-items:flex-start}.card{padding:12px}}
+
+    /* Tiny utils */
+    .muted{color:var(--muted);font-size:13px}
+    .controls{display:flex;gap:8px;align-items:center}
+
+    /* Search */
+    .search{display:flex;gap:8px}
+    .search input{padding:10px;border-radius:10px;border:1px solid rgba(0,0,0,0.06)}
+
+    /* Drag handle */
+    .drag{cursor:grab;padding:6px}
+
+    footer.small{grid-column:1/3;text-align:center;color:var(--muted);font-size:12px;margin-top:6px}
+  </style>
+</head>
+<body>
+  <div class="app">
+    <div class="header">
+      <div class="logo">
+        <div class="mark">CD</div>
+        <div>
+          <h1>CozyDo</h1>
+          <p class="small">Offline‑first, colorful productivity that works on mobile & desktop</p>
+        </div>
+      </div>
+
+      <div style="margin-left:auto;display:flex;gap:8px;align-items:center">
+        <div class="search card" style="display:flex;align-items:center;padding:8px">
+          <input id="search" placeholder="Search tasks, notes..." />
+          <button class="btn ghost" id="clearSearch">Clear</button>
+        </div>
+        <div class="controls">
+          <button class="btn" id="addQuick">+ Quick</button>
+          <button class="btn ghost" id="themeBtn">Theme</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Left: Tasks & Notes -->
+    <div>
+      <div class="card">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+          <div>
+            <strong>Tasks</strong>
+            <div class="muted" id="taskCount">0 tasks</div>
+          </div>
+          <div class="controls">
+            <button class="btn ghost" id="exportBtn">Export</button>
+            <button class="btn ghost" id="importBtn">Import</button>
+            <input type="file" id="importFile" accept="application/json" style="display:none" />
+          </div>
+        </div>
+
+        <div class="new-row">
+          <input id="newTask" type="text" placeholder="Add a task — press Enter" />
+          <button class="btn" id="addBtn">Add</button>
+        </div>
+
+        <div style="margin-top:12px">
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
+            <button class="btn ghost" data-filter="all">All</button>
+            <button class="btn ghost" data-filter="active">Active</button>
+            <button class="btn ghost" data-filter="completed">Completed</button>
+            <button class="btn ghost" id="clearCompleted">Clear Completed</button>
+          </div>
+
+          <div class="todo-list" id="tasks"></div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:12px">
+        <strong>Notes</strong>
+        <textarea id="noteArea" class="note" placeholder="Write notes, ideas, paste images (base64) — saved locally"></textarea>
+        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px">
+          <button class="btn ghost" id="clearNotes">Clear</button>
+          <button class="btn" id="saveNote">Save Note</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right: Sidebar -->
+    <div class="sidebar">
+      <div class="card calendar">
+        <div class="month">
+          <strong id="monthLabel">Month</strong>
+          <div class="controls"><button class="btn ghost" id="prevMonth">◀</button><button class="btn ghost" id="nextMonth">▶</button></div>
+        </div>
+        <div class="days" id="calendarGrid"></div>
+      </div>
+
+      <div class="card small-grid">
+        <div style="grid-column:1/3"><strong>Pomodoro</strong>
+          <div class="pom">
+            <div class="timer" id="pomTimer">25:00</div>
+            <div class="controls"><button class="btn" id="startPom">Start</button><button class="btn ghost" id="stopPom">Stop</button></div>
+          </div>
+        </div>
+
+        <div class="card" style="padding:10px">
+          <strong>Habits</strong>
+          <div class="muted" style="font-size:13px">Check off daily habits</div>
+          <div style="display:flex;gap:8px;margin-top:8px"><input id="habitText" placeholder="New habit" /><button class="btn" id="addHabit">Add</button></div>
+          <div id="habitsList" style="margin-top:8px"></div>
+        </div>
+
+        <div class="card" style="padding:10px">
+          <strong>Settings</strong>
+          <div style="margin-top:8px;display:flex;flex-direction:column;gap:8px">
+            <label><input type="checkbox" id="notifyToggle" /> Enable notifications</label>
+            <label><input type="checkbox" id="soundToggle" /> Sounds</label>
+            <button class="btn ghost" id="resetApp">Reset App</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" style="text-align:center">
+        <div class="small muted">Quick tips</div>
+        <div style="margin-top:8px">Drag tasks to reorder • Use Export to backup • Add to Home Screen to install</div>
+      </div>
+    </div>
+
+    <footer class="small">Made with 🌈 — CozyDo — works offline as a PWA</footer>
+  </div>
+
+  <script>
+    /* ========= Single-file PWA trick: create manifest & service worker via Blob so no extra files needed ========= */
+
+    // 1) Create and register manifest
+    const manifest = {
+      name: 'CozyDo',
+      short_name: 'CozyDo',
+      description: 'Cozy, colorful offline to-do & notes PWA',
+      start_url: './',
+      display: 'standalone',
+      background_color: '#fff7ff',
+      theme_color: '#ff6b6b',
+      icons: [{src: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="192" height="192"><rect rx="36" width="100%" height="100%" fill="%23ff6b6b"/></svg>', sizes: '192x192', type: 'image/svg+xml'}]
+    };
+
+    const manifestBlob = new Blob([JSON.stringify(manifest)], {type: 'application/json'});
+    const manifestURL = URL.createObjectURL(manifestBlob);
+    const link = document.createElement('link');
+    link.rel = 'manifest';
+    link.href = manifestURL;
+    document.head.appendChild(link);
+
+    // 2) Build service worker script as a blob so this remains a single file app
+    const swSource = `
+      const CACHE_NAME = 'cozydo-cache-v1';
+      const OFFLINE_URL = './';
+      const toCache = ['/', OFFLINE_URL];
+
+      self.addEventListener('install', (e) => {
+        self.skipWaiting();
+        e.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(toCache)));
+      });
+
+      self.addEventListener('fetch', (e) => {
+        e.respondWith(caches.match(e.request).then(resp => resp || fetch(e.request).then(fetchResp => {
+          // Put a copy in cache
+          caches.open(CACHE_NAME).then(cache => cache.put(e.request, fetchResp.clone()));
+          return fetchResp;
+        }).catch(() => caches.match(OFFLINE_URL))));
+      });
+
+      self.addEventListener('activate', (e) => {
+        e.waitUntil(clients.claim());
+      });
+    `;
+    const swBlob = new Blob([swSource], {type: 'application/javascript'});
+    const swURL = URL.createObjectURL(swBlob);
+
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register(swURL).then(()=>console.log('Service worker (blob) registered')).catch(console.warn);
+    }
+
+    /* ========= App logic ========= */
+    const DB = {
+      tasks: JSON.parse(localStorage.getItem('cozy_tasks')||'[]'),
+      notes: localStorage.getItem('cozy_notes')||'',
+      habits: JSON.parse(localStorage.getItem('cozy_habits')||'[]'),
+      settings: JSON.parse(localStorage.getItem('cozy_settings')||'{}')
+    };
+
+    // Defaults
+    DB.settings = Object.assign({notifications:false,sound:false,theme:'vibrant'}, DB.settings);
+
+    // Utilities
+    function saveAll(){
+      localStorage.setItem('cozy_tasks', JSON.stringify(DB.tasks));
+      localStorage.setItem('cozy_notes', DB.notes);
+      localStorage.setItem('cozy_habits', JSON.stringify(DB.habits));
+      localStorage.setItem('cozy_settings', JSON.stringify(DB.settings));
+      refreshUI();
+    }
+
+    function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,8)}
+
+    // Task handling
+    const tasksEl = document.getElementById('tasks');
+    const newTask = document.getElementById('newTask');
+    const addBtn = document.getElementById('addBtn');
+
+    function renderTasks(filter='all',q=''){
+      tasksEl.innerHTML = '';
+      let list = DB.tasks.slice().filter(t=>{
+        if(filter==='active') return !t.done;
+        if(filter==='completed') return t.done;
+        return true;
+      }).filter(t=>(!q || (t.text||'').toLowerCase().includes(q.toLowerCase())));
+
+      document.getElementById('taskCount').innerText = list.length + ' tasks';
+
+      list.forEach((t,i)=>{
+        const el = document.createElement('div');
+        el.className = 'task card'+(t.done?' completed':'');
+        el.draggable = true;
+        el.dataset.id = t.id;
+
+        el.innerHTML = `
+          <div class="check">${t.done? '✔':'○'}</div>
+          <div>
+            <div style="display:flex;gap:8px;align-items:center">
+              <div style="font-weight:600">${escapeHtml(t.text)}</div>
+              ${t.tag? `<div class="tag">${escapeHtml(t.tag)}</div>`:''}
+            </div>
+            <div class="meta">${t.note?escapeHtml(t.note):''} ${t.due? ' • due '+t.due:''}</div>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center">
+            <button class="btn ghost small editBtn">Edit</button>
+            <button class="btn ghost small delBtn">Delete</button>
+            <div class="drag">⋮</div>
+          </div>`;
+
+        // events
+        el.querySelector('.check').addEventListener('click', ()=>{
+          t.done = !t.done; saveAll();
+          if(t.done && DB.settings.notifications) notify('Task completed', t.text);
+        });
+        el.querySelector('.delBtn').addEventListener('click', ()=>{DB.tasks = DB.tasks.filter(x=>x.id!==t.id); saveAll();});
+        el.querySelector('.editBtn').addEventListener('click', ()=>{const n = prompt('Edit task', t.text); if(n!==null){t.text=n; saveAll();}});
+
+        // drag
+        el.addEventListener('dragstart', (ev)=>{ev.dataTransfer.setData('text/plain', t.id)});
+        el.addEventListener('dragover', (ev)=>ev.preventDefault());
+        el.addEventListener('drop', (ev)=>{
+          const draggedId = ev.dataTransfer.getData('text/plain');
+          const fromIndex = DB.tasks.findIndex(x=>x.id===draggedId);
+          const toIndex = DB.tasks.findIndex(x=>x.id===t.id);
+          if(fromIndex>-1 && toIndex>-1){
+            const [m] = DB.tasks.splice(fromIndex,1);
+            DB.tasks.splice(toIndex,0,m);
+            saveAll();
+          }
+        });
+
+        tasksEl.appendChild(el);
+      });
+    }
+
+    function escapeHtml(s){return String(s||'').replace(/[&<>\"']/g, c=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+
+    addBtn.addEventListener('click', ()=>{if(newTask.value.trim()){DB.tasks.unshift({id:uid(),text:newTask.value.trim(),done:false,created:Date.now()}); newTask.value=''; saveAll();}});
+    newTask.addEventListener('keydown', e=>{if(e.key==='Enter'){addBtn.click();}});
+
+    // Filters
+    document.querySelectorAll('[data-filter]').forEach(btn=>btn.addEventListener('click', (e)=>{renderTasks(e.target.dataset.filter,document.getElementById('search').value)}));
+
+    document.getElementById('clearCompleted').addEventListener('click', ()=>{DB.tasks=DB.tasks.filter(t=>!t.done); saveAll();});
+
+    // Search
+    document.getElementById('search').addEventListener('input', (e)=>renderTasks('all', e.target.value));
+    document.getElementById('clearSearch').addEventListener('click', ()=>{document.getElementById('search').value=''; renderTasks();});
+
+    // Notes
+    const noteArea = document.getElementById('noteArea');
+    noteArea.value = DB.notes;
+    document.getElementById('saveNote').addEventListener('click', ()=>{DB.notes = noteArea.value; saveAll();});
+    document.getElementById('clearNotes').addEventListener('click', ()=>{if(confirm('Clear notes?')){DB.notes='';noteArea.value='';saveAll();}});
+
+    // Export / Import
+    document.getElementById('exportBtn').addEventListener('click', ()=>{
+      const blob = new Blob([JSON.stringify({tasks:DB.tasks,notes:DB.notes,habits:DB.habits,settings:DB.settings})],{type:'application/json'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href = url; a.download = 'cozydo-backup-'+(new Date()).toISOString().slice(0,10)+'.json'; a.click(); URL.revokeObjectURL(url);
+    });
+    document.getElementById('importBtn').addEventListener('click', ()=>document.getElementById('importFile').click());
+    document.getElementById('importFile').addEventListener('change', (e)=>{
+      const f = e.target.files[0]; if(!f) return; const r = new FileReader(); r.onload = ()=>{
+        try{const obj = JSON.parse(r.result); DB.tasks = obj.tasks||DB.tasks; DB.notes = obj.notes||DB.notes; DB.habits = obj.habits||DB.habits; DB.settings = obj.settings||DB.settings; saveAll(); alert('Imported');}
+        catch(err){alert('Invalid file')}
+      }; r.readAsText(f);
+    });
+
+    // Habits
+    document.getElementById('addHabit').addEventListener('click', ()=>{
+      const t = document.getElementById('habitText'); if(!t.value.trim()) return; DB.habits.push({id:uid(),text:t.value.trim(),check:false,last: null}); t.value=''; saveAll();
+    });
+
+    function renderHabits(){
+      const el = document.getElementById('habitsList'); el.innerHTML=''; DB.habits.forEach(h=>{
+        const d = document.createElement('div'); d.style.display='flex'; d.style.justifyContent='space-between'; d.style.alignItems='center'; d.style.padding='6px 0';
+        d.innerHTML = `<div>${escapeHtml(h.text)}</div><div><input type='checkbox' ${h.check?'checked':''} /></div>`;
+        d.querySelector('input').addEventListener('change', (ev)=>{h.check = ev.target.checked; h.last = h.check? new Date().toISOString():h.last; saveAll();});
+        el.appendChild(d);
+      });
+    }
+
+    // Calendar (very simple month grid)
+    let viewDate = new Date();
+    function renderCalendar(){
+      const grid = document.getElementById('calendarGrid'); grid.innerHTML='';
+      const m = viewDate.getMonth(); const y = viewDate.getFullYear();
+      document.getElementById('monthLabel').innerText = viewDate.toLocaleString(undefined,{month:'long',year:'numeric'});
+      const first = new Date(y,m,1); const startDay = first.getDay();
+      const daysInMonth = new Date(y,m+1,0).getDate();
+      // fill blanks
+      for(let i=0;i<startDay;i++){const d=document.createElement('div');d.className='day';grid.appendChild(d)}
+      for(let d=1;d<=daysInMonth;d++){
+        const el = document.createElement('div'); el.className='day'; el.innerText = d;
+        const today = new Date(); if(d===today.getDate() && m===today.getMonth() && y===today.getFullYear()) el.classList.add('today');
+        grid.appendChild(el);
+      }
+    }
+    document.getElementById('prevMonth').addEventListener('click', ()=>{viewDate.setMonth(viewDate.getMonth()-1); renderCalendar();});
+    document.getElementById('nextMonth').addEventListener('click', ()=>{viewDate.setMonth(viewDate.getMonth()+1); renderCalendar();});
+
+    // Simple Pomodoro
+    let pomInterval = null; let pomRemaining = 25*60; let pomRunning=false;
+    function updatePomUI(){const mm = String(Math.floor(pomRemaining/60)).padStart(2,'0'); const ss = String(pomRemaining%60).padStart(2,'0'); document.getElementById('pomTimer').innerText = mm+':'+ss}
+    document.getElementById('startPom').addEventListener('click', ()=>{
+      if(pomRunning) return; pomRunning=true; pomInterval = setInterval(()=>{pomRemaining--; if(pomRemaining<=0){clearInterval(pomInterval);pomRunning=false;pomRemaining=25*60; if(DB.settings.notifications) notify('Pomodoro finished','Take a short break!'); if(DB.settings.sound) playBeep();} updatePomUI();},1000);
+    });
+    document.getElementById('stopPom').addEventListener('click', ()=>{clearInterval(pomInterval);pomRunning=false;pomRemaining=25*60;updatePomUI();});
+
+    function playBeep(){try{const o=new AudioContext();const o2=o.createOscillator();o2.connect(o.destination);o2.start();o2.frequency.value=880;setTimeout(()=>{o2.stop();o.close()},200);}catch(e){console.warn(e)}}
+
+    // Notifications
+    function notify(title,body){if(!('Notification' in window)) return; if(Notification.permission==='granted'){new Notification(title,{body})} }
+    document.getElementById('notifyToggle').addEventListener('change',(e)=>{DB.settings.notifications=e.target.checked; if(e.target.checked && Notification.permission!=='granted') Notification.requestPermission().then(()=>saveAll()); saveAll();});
+    document.getElementById('soundToggle').addEventListener('change',(e)=>{DB.settings.sound=e.target.checked; saveAll()});
+
+    // Theme toggle (simple cycle between palettes)
+    const themes = [
+      {bg:'#fff7ff',accent1:'#ff6b6b',accent4:'#6bffb8',accent5:'#6bb6ff'},
+      {bg:'#e8fff7',accent1:'#00b894',accent4:'#74b9ff',accent5:'#55efc4'},
+      {bg:'#fff8e6',accent1:'#fdcb6e',accent4:'#ff7675',accent5:'#74b9ff'}
+    ];
+    let themeIndex = 0;
+    document.getElementById('themeBtn').addEventListener('click', ()=>{themeIndex=(themeIndex+1)%themes.length; const t=themes[themeIndex]; document.documentElement.style.setProperty('--bg',t.bg); document.documentElement.style.setProperty('--accent1',t.accent1); document.documentElement.style.setProperty('--accent4',t.accent4); document.documentElement.style.setProperty('--accent5',t.accent5); DB.settings.theme=themeIndex; saveAll();});
+
+    // Reset
+    document.getElementById('resetApp').addEventListener('click', ()=>{if(confirm('Reset app and delete local data?')){localStorage.clear();location.reload();}});
+
+    // Quick add
+    document.getElementById('addQuick').addEventListener('click', ()=>{
+      const t = prompt('Quick add task'); if(t) {DB.tasks.unshift({id:uid(),text:t,done:false}); saveAll();}
+    });
+
+    // Export UI on load
+    function refreshUI(){renderTasks(); renderHabits(); renderCalendar(); noteArea.value = DB.notes; document.getElementById('notifyToggle').checked = DB.settings.notifications; document.getElementById('soundToggle').checked = DB.settings.sound;}
+
+    // On start
+    refreshUI(); updatePomUI();
+
+    // Import shortcut: Ctrl+I to import file dialog
+    window.addEventListener('keydown', (e)=>{if(e.ctrlKey && e.key.toLowerCase()==='i'){document.getElementById('importFile').click()}});
+
+    // Simple automatic save for notes every 3 seconds if changed
+    let lastNote = noteArea.value; setInterval(()=>{if(noteArea.value!==lastNote){lastNote=noteArea.value; DB.notes=lastNote; saveAll()}},3000);
+
+    // small helper: make app installable prompt
+    let deferredPrompt;
+    window.addEventListener('beforeinstallprompt',(e)=>{e.preventDefault();deferredPrompt=e; const b = document.createElement('button'); b.innerText='Install'; b.className='btn'; b.addEventListener('click', async ()=>{deferredPrompt.prompt(); const r = await deferredPrompt.userChoice; deferredPrompt=null; b.remove();}); document.querySelector('.header').appendChild(b);});
+
+    // simple escape hatch for offline (show cached keys)
+    window.addEventListener('load', async ()=>{if('caches' in window){const keys = await caches.keys(); console.log('Caches:',keys)}})
+
+    // Helper: small alert when page hidden to simulate background save
+    document.addEventListener('visibilitychange', ()=>{if(document.hidden) saveAll();});
+  </script>
+</body>
+</html>
